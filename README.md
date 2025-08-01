@@ -115,10 +115,7 @@ scheduler:
 - List all interesting events with pagination
 - Query parameters: `offset`, `limit`
 
-### User Management
-- **GET** `/api/v1/users`
-- **POST** `/api/v1/users`
-- **GET** `/api/v1/users/{id}`
+
 
 ## Testing the Correlation System
 

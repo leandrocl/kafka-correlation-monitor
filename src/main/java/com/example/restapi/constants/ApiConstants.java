@@ -16,11 +16,6 @@ public final class ApiConstants {
     public static final String API_BASE_PATH = "/api/" + API_VERSION;
     
     /**
-     * Users API path
-     */
-    public static final String USERS_API_PATH = API_BASE_PATH + "/users";
-    
-    /**
      * Health check API path
      */
     public static final String HEALTH_API_PATH = API_BASE_PATH + "/health";
