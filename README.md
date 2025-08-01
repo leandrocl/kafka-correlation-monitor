@@ -1,54 +1,61 @@
-# Spring Boot REST API
+# Kafka Correlation Monitor
 
-A comprehensive RESTful API built with Spring Boot 3.2.0, featuring HSQLDB persistence, AWS SQS/SNS integration, and OpenAPI documentation.
+A comprehensive Spring Boot REST API that implements Kafka correlation monitoring and event processing. The application dynamically consumes messages from Kafka topics, extracts keys of interest, persists interesting events, and correlates them across related topics.
 
 ## Features
 
 - **Spring Boot 3.2.0** with Java 21
-- **HSQLDB** with persistent local storage
-- **AWS SQS** integration (producer/consumer)
-- **AWS SNS** integration (publisher/subscriber)
-- **Health check endpoint** with database connectivity testing
+- **Apache Kafka** integration with dynamic topic consumption
+- **HSQLDB** with persistent local storage and Flyway migrations
+- **Dynamic Kafka Consumers** with configurable topics and correlation logic
+- **Event Correlation** across main and correlated topics
+- **Scheduled Cleanup** of correlated events
+- **Event Monitoring** for uncorrelated events
+- **REST API** with pagination and event management
 - **OpenAPI/Swagger** documentation
 - **Actuator** endpoints for monitoring
+
+## Key Components
+
+### Kafka Correlation System
+- **Dynamic Topic Configuration**: Configure topics with keys of interest and correlated topics
+- **Event Persistence**: Automatically persist events with keys of interest to database
+- **Correlation Logic**: Match events across main and correlated topics
+- **Real-time Processing**: Process messages as they arrive from Kafka
+
+### Scheduled Tasks
+- **Cleanup Scheduler**: Automatically removes correlated events (configurable interval)
+- **Monitor Scheduler**: Tracks uncorrelated events older than threshold (configurable)
+
+### Database Management
+- **Flyway Migrations**: Automated database schema management
+- **HSQLDB**: Lightweight, file-based database
+- **Event Storage**: Persistent storage of interesting events with correlation data
 
 ## Prerequisites
 
 - Java 21 or higher
 - Maven 3.6 or higher
-- AWS CLI (optional, for AWS credentials)
+- Apache Kafka (running on localhost:9092 by default)
 
 ## Quick Start
 
 ### 1. Clone and Build
 
 ```bash
-cd spring-boot-rest-api
+git clone https://github.com/leandrocl/kafka-correlation-monitor.git
+cd kafka-correlation-monitor
 mvn clean install
 ```
 
-### 2. Configure AWS Credentials (Optional)
+### 2. Start Kafka (if not running)
 
-If you want to use real AWS services, configure your credentials:
-
-**Option A: Environment Variables**
 ```bash
-export AWS_ACCESS_KEY_ID=your_access_key
-export AWS_SECRET_ACCESS_KEY=your_secret_key
-export AWS_REGION=us-east-1
-```
+# Using Docker
+docker run -p 9092:9092 apache/kafka:2.13-3.6.1
 
-**Option B: AWS CLI**
-```bash
-aws configure
-```
-
-**Option C: Application Properties**
-Add to `src/main/resources/application.yml`:
-```yaml
-aws:
-  access-key-id: your_access_key
-  secret-access-key: your_secret_key
+# Or using local Kafka installation
+# Start Zookeeper and Kafka brokers
 ```
 
 ### 3. Run the Application
@@ -59,6 +66,38 @@ mvn spring-boot:run
 
 The application will start on `http://localhost:8080`
 
+## Configuration
+
+### Kafka Topics Configuration
+
+The application supports dynamic topic configuration in `application.yml`:
+
+```yaml
+kafka:
+  topics:
+    - name: test-topic
+      consumer-group: test-consumer-group
+      correlated-topic: test-topic-correlated
+      key-of-interest: userId
+      correlated-key-of-interest: correlationId
+    - name: user-events
+      consumer-group: user-events-consumer-group
+      correlated-topic: user-events-correlated
+      key-of-interest: userEmail
+      correlated-key-of-interest: transactionId
+```
+
+### Scheduler Configuration
+
+```yaml
+scheduler:
+  cleanup:
+    interval-seconds: 60  # Cleanup correlated events every 60 seconds
+  monitor:
+    interval-seconds: 30  # Monitor uncorrelated events every 30 seconds
+    age-threshold-seconds: 300  # Events older than 5 minutes
+```
+
 ## API Endpoints
 
 ### Health Check
@@ -66,45 +105,84 @@ The application will start on `http://localhost:8080`
 - Tests database connectivity
 - Returns HTTP 200 if healthy, 503 if unhealthy
 
-### Echo Endpoint
-- **GET** `/api/v1/echo?inputString=Hello World`
-- Returns the input string in JSON format
-- Example response: `{"responseString": "Hello World"}`
+### Kafka Producer
+- **POST** `/api/v1/kafka/produce`
+- Send messages to Kafka topics
+- Request body: `{"kafkaTopic": "topic-name", "message": "JSON message"}`
 
-### AWS SQS Endpoints
-- **POST** `/api/v1/sqs/send` - Send message to SQS queue
-- **GET** `/api/v1/sqs/receive` - Receive messages from SQS queue
+### Interesting Events
+- **GET** `/api/v1/interesting-events`
+- List all interesting events with pagination
+- Query parameters: `offset`, `limit`
 
-### AWS SNS Endpoints
-- **POST** `/api/v1/sns/publish` - Publish message to SNS topic
+### User Management
+- **GET** `/api/v1/users`
+- **POST** `/api/v1/users`
+- **GET** `/api/v1/users/{id}`
 
-## Documentation
+## Testing the Correlation System
 
-### Swagger UI
-- **URL**: `http://localhost:8080/swagger-ui.html`
-- Interactive API documentation
+### 1. Send a message to a main topic
 
-### OpenAPI JSON
-- **URL**: `http://localhost:8080/api-docs`
-- Raw OpenAPI specification
+```bash
+curl -X POST "http://localhost:8080/api/v1/kafka/produce" \
+  -H "Content-Type: application/json" \
+  -d '{"kafkaTopic": "test-topic", "message": "{\"userId\":\"user123\",\"message\":\"Test message\"}"}'
+```
 
-### Actuator Endpoints
-- **Health**: `http://localhost:8080/actuator/health`
-- **Info**: `http://localhost:8080/actuator/info`
-- **Metrics**: `http://localhost:8080/actuator/metrics`
+### 2. Send a correlated message
 
-## Configuration
+```bash
+curl -X POST "http://localhost:8080/api/v1/kafka/produce" \
+  -H "Content-Type: application/json" \
+  -d '{"kafkaTopic": "test-topic-correlated", "message": "{\"correlationId\":\"user123\",\"message\":\"Correlated message\"}"}'
+```
 
-### Database
-- **Type**: HSQLDB with file persistence
-- **Location**: `./data/restapi` (created automatically)
-- **Username**: `sa`
-- **Password**: (empty)
+### 3. Check the events
 
-### AWS Configuration
-- **Region**: `us-east-1` (configurable)
-- **SQS Queue URL**: Configured in `application.yml`
-- **SNS Topic ARN**: Configured in `application.yml`
+```bash
+curl "http://localhost:8080/api/v1/interesting-events"
+```
+
+## Database Schema
+
+### Interesting Events Table
+
+```sql
+CREATE TABLE interesting_events (
+    id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    topic_name VARCHAR(100) NOT NULL,
+    key_of_interest_name VARCHAR(100) NOT NULL,
+    key_of_interest_value VARCHAR(500) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    correlated_message VARCHAR(1000),
+    is_correlated BOOLEAN DEFAULT FALSE,
+    correlation_timestamp TIMESTAMP DEFAULT NULL
+);
+```
+
+## Monitoring and Logging
+
+### Log Files
+- **Location**: `output.log` in project root
+- **Rotation**: Daily with 30-day retention
+- **Size Limit**: 3GB total
+
+### Scheduler Logs
+- **Cleanup**: Logs number of correlated events deleted
+- **Monitor**: Logs uncorrelated events count by topic
+
+### Example Log Output
+
+```
+Starting cleanup of correlated events from interesting_events table...
+Cleanup completed successfully. Deleted 1 correlated event records from interesting_events table.
+
+Starting monitoring of uncorrelated events older than 300 seconds...
+Found 2 topics with uncorrelated events older than 300 seconds:
+Topic: 'test-topic' - Uncorrelated events count: 3
+Topic: 'user-events' - Uncorrelated events count: 1
+```
 
 ## Project Structure
 
@@ -112,44 +190,29 @@ The application will start on `http://localhost:8080`
 src/
 ├── main/
 │   ├── java/com/example/restapi/
-│   │   ├── RestApiApplication.java      # Main application class
+│   │   ├── RestApiApplication.java              # Main application class
 │   │   ├── config/
-│   │   │   └── AwsConfig.java          # AWS client configuration
+│   │   │   ├── KafkaConfig.java                 # Kafka configuration
+│   │   │   └── KafkaTopicConfig.java            # Topic configuration
 │   │   ├── controller/
-│   │   │   └── ApiController.java       # REST endpoints
+│   │   │   ├── ApiController.java               # Health endpoints
+│   │   │   ├── KafkaController.java             # Kafka producer endpoints
+│   │   │   └── InterestingEventController.java  # Event management
+│   │   ├── entity/
+│   │   │   └── InterestingEvent.java            # Event entity
+│   │   ├── repository/
+│   │   │   └── InterestingEventRepository.java  # Data access
 │   │   └── service/
-│   │       ├── SqsService.java          # SQS operations
-│   │       └── SnsService.java          # SNS operations
+│   │       ├── DynamicKafkaConsumerService.java # Kafka consumers
+│   │       ├── InterestingEventService.java     # Event processing
+│   │       ├── InterestingEventCleanupScheduler.java    # Cleanup scheduler
+│   │       └── InterestingEventMonitorScheduler.java    # Monitor scheduler
 │   └── resources/
-│       └── application.yml              # Application configuration
+│       ├── application.yml                      # Application configuration
+│       ├── logback-spring.xml                  # Logging configuration
+│       └── db/migration/                       # Flyway migrations
 └── test/
-    └── java/com/example/restapi/       # Test classes
-```
-
-## Testing the API
-
-### Health Check
-```bash
-curl http://localhost:8080/api/v1/health
-```
-
-### Echo Endpoint
-```bash
-curl "http://localhost:8080/api/v1/echo?inputString=Hello%20World"
-```
-
-### Send SQS Message
-```bash
-curl -X POST http://localhost:8080/api/v1/sqs/send \
-  -H "Content-Type: application/json" \
-  -d '{"message": "Test message"}'
-```
-
-### Publish SNS Message
-```bash
-curl -X POST http://localhost:8080/api/v1/sns/publish \
-  -H "Content-Type: application/json" \
-  -d '{"message": "Test notification"}'
+    └── java/com/example/restapi/               # Test classes
 ```
 
 ## Development
@@ -169,24 +232,46 @@ mvn clean package
 java -jar target/rest-api-1.0.0.jar
 ```
 
+### Database Reset
+```bash
+rm -rf data/
+mvn flyway:migrate
+```
+
+## Configuration Options
+
+### Kafka Configuration
+- **Bootstrap Servers**: `localhost:9092` (configurable)
+- **Consumer Groups**: Separate groups for main and correlated topics
+- **Auto Offset Reset**: `earliest`
+- **Enable Auto Commit**: `false`
+
+### Database Configuration
+- **Type**: HSQLDB with file persistence
+- **Location**: `./data/restapi`
+- **Migrations**: Automatic via Flyway
+
+### Scheduler Configuration
+- **Cleanup Interval**: 60 seconds (configurable)
+- **Monitor Interval**: 30 seconds (configurable)
+- **Age Threshold**: 300 seconds (configurable)
+
 ## Troubleshooting
+
+### Kafka Connection Issues
+- Ensure Kafka is running on `localhost:9092`
+- Check topic configuration in `application.yml`
+- Verify consumer groups are properly configured
 
 ### Database Issues
 - Check if the `./data` directory is writable
-- Verify HSQLDB is properly configured in `application.yml`
+- Run `mvn flyway:migrate` to apply migrations
+- Verify HSQLDB configuration in `application.yml`
 
-### AWS Issues
-- Ensure AWS credentials are properly configured
-- Check AWS region settings
-- Verify SQS queue and SNS topic exist (if using real AWS)
-
-### Port Issues
-- Default port is 8080
-- Change in `application.yml` if needed:
-```yaml
-server:
-  port: 8081
-```
+### Scheduler Issues
+- Check logs for scheduler execution
+- Verify configuration values in `application.yml`
+- Ensure database connectivity
 
 ## License
 
