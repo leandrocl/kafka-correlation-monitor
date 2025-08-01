@@ -1,0 +1,80 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password: 
+    driver-class-name: org.h2.Driver
+  
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.H2Dialect
+  
+  flyway:
+    enabled: false
+  
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      retries: 3
+      batch-size: 16384
+      linger-ms: 1
+      buffer-memory: 33554432
+    consumer:
+      group-id: test-consumer-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      enable-auto-commit: false
+      auto-commit-interval-ms: 1000
+      session-timeout-ms: 30000
+      heartbeat-interval-ms: 3000
+      max-poll-records: 500
+      max-poll-interval-ms: 300000
+
+# Kafka Topics Configuration for Testing
+kafka:
+  topics:
+    - name: test-topic
+      consumer-group: test-consumer-group
+      correlated-topic: test-topic-correlated
+      key-of-interest: userId
+      correlated-key-of-interest: correlationId
+    - name: test-topic-json
+      consumer-group: json-consumer-group
+      correlated-topic: test-topic-json-correlated
+      key-of-interest: messageId
+      correlated-key-of-interest: sessionId
+
+# Scheduler Configuration for Testing
+scheduler:
+  cleanup:
+    interval-seconds: 60
+  monitor:
+    interval-seconds: 30
+    age-threshold-seconds: 300
+
+# Actuator Configuration for Testing
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
+# Logging Configuration for Testing
+logging:
+  level:
+    com.example.restapi: DEBUG
+    org.springframework.kafka: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE 

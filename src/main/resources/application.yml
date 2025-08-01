@@ -104,10 +104,10 @@ springdoc:
 # Scheduler Configuration
 scheduler:
   cleanup:
-    interval-seconds: 10
+    interval-seconds: 60
   monitor:
-    interval-seconds: 30
-    age-threshold-seconds: 60
+    interval-seconds: 10
+    age-threshold-seconds: 40
     
   info:
     title: Spring Boot REST API

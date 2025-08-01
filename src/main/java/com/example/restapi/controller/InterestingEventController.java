@@ -10,8 +10,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.constraints.Min;
+import jakarta.validation.Valid;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.HashMap;
@@ -21,6 +24,7 @@ import java.util.Map;
 @RestController
 @RequestMapping(ApiConstants.API_BASE_PATH + "/interesting-events")
 @Tag(name = "Interesting Events", description = "APIs for managing interesting events from Kafka messages")
+@Validated
 public class InterestingEventController {
 
     private final InterestingEventService interestingEventService;
@@ -41,6 +45,25 @@ public class InterestingEventController {
             
             @Parameter(description = "Page size", example = "10")
             @RequestParam(defaultValue = "10") int size) {
+
+        // Validate pagination parameters
+        if (page < 0) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Invalid pagination parameter");
+            errorResponse.put("message", "Page number must be non-negative");
+            errorResponse.put("status", "BAD_REQUEST");
+            errorResponse.put("timestamp", System.currentTimeMillis());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+        }
+        
+        if (size < 1) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Invalid pagination parameter");
+            errorResponse.put("message", "Page size must be at least 1");
+            errorResponse.put("status", "BAD_REQUEST");
+            errorResponse.put("timestamp", System.currentTimeMillis());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+        }
 
         try {
             Page<InterestingEvent> eventsPage = interestingEventService.findAll(page, size);
@@ -77,6 +100,25 @@ public class InterestingEventController {
             
             @Parameter(description = "Limit (number of records to return)", example = "10")
             @RequestParam(defaultValue = "10") int limit) {
+
+        // Validate pagination parameters
+        if (offset < 0) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Invalid pagination parameter");
+            errorResponse.put("message", "Offset must be non-negative");
+            errorResponse.put("status", "BAD_REQUEST");
+            errorResponse.put("timestamp", System.currentTimeMillis());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+        }
+        
+        if (limit < 1) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Invalid pagination parameter");
+            errorResponse.put("message", "Limit must be at least 1");
+            errorResponse.put("status", "BAD_REQUEST");
+            errorResponse.put("timestamp", System.currentTimeMillis());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+        }
 
         try {
             List<InterestingEvent> events = interestingEventService.findAllWithOffset(offset, limit);
@@ -117,6 +159,25 @@ public class InterestingEventController {
             @Parameter(description = "Page size", example = "10")
             @RequestParam(defaultValue = "10") int size) {
 
+        // Validate pagination parameters
+        if (page < 0) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Invalid pagination parameter");
+            errorResponse.put("message", "Page number must be non-negative");
+            errorResponse.put("status", "BAD_REQUEST");
+            errorResponse.put("timestamp", System.currentTimeMillis());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+        }
+        
+        if (size < 1) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Invalid pagination parameter");
+            errorResponse.put("message", "Page size must be at least 1");
+            errorResponse.put("status", "BAD_REQUEST");
+            errorResponse.put("timestamp", System.currentTimeMillis());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+        }
+
         try {
             Page<InterestingEvent> eventsPage = interestingEventService.findByTopicName(topicName, page, size);
             
@@ -156,6 +217,25 @@ public class InterestingEventController {
             
             @Parameter(description = "Page size", example = "10")
             @RequestParam(defaultValue = "10") int size) {
+
+        // Validate pagination parameters
+        if (page < 0) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Invalid pagination parameter");
+            errorResponse.put("message", "Page number must be non-negative");
+            errorResponse.put("status", "BAD_REQUEST");
+            errorResponse.put("timestamp", System.currentTimeMillis());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+        }
+        
+        if (size < 1) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Invalid pagination parameter");
+            errorResponse.put("message", "Page size must be at least 1");
+            errorResponse.put("status", "BAD_REQUEST");
+            errorResponse.put("timestamp", System.currentTimeMillis());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+        }
 
         try {
             Page<InterestingEvent> eventsPage = interestingEventService.findByKeyOfInterestName(keyOfInterestName, page, size);
@@ -200,6 +280,25 @@ public class InterestingEventController {
             @Parameter(description = "Page size", example = "10")
             @RequestParam(defaultValue = "10") int size) {
 
+        // Validate pagination parameters
+        if (page < 0) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Invalid pagination parameter");
+            errorResponse.put("message", "Page number must be non-negative");
+            errorResponse.put("status", "BAD_REQUEST");
+            errorResponse.put("timestamp", System.currentTimeMillis());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+        }
+        
+        if (size < 1) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Invalid pagination parameter");
+            errorResponse.put("message", "Page size must be at least 1");
+            errorResponse.put("status", "BAD_REQUEST");
+            errorResponse.put("timestamp", System.currentTimeMillis());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+        }
+
         try {
             Page<InterestingEvent> eventsPage = interestingEventService.findByTopicNameAndKeyOfInterestName(topicName, keyOfInterestName, page, size);
             
@@ -243,6 +342,25 @@ public class InterestingEventController {
             
             @Parameter(description = "Page size", example = "10")
             @RequestParam(defaultValue = "10") int size) {
+
+        // Validate pagination parameters
+        if (page < 0) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Invalid pagination parameter");
+            errorResponse.put("message", "Page number must be non-negative");
+            errorResponse.put("status", "BAD_REQUEST");
+            errorResponse.put("timestamp", System.currentTimeMillis());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+        }
+        
+        if (size < 1) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Invalid pagination parameter");
+            errorResponse.put("message", "Page size must be at least 1");
+            errorResponse.put("status", "BAD_REQUEST");
+            errorResponse.put("timestamp", System.currentTimeMillis());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+        }
 
         try {
             Instant start = Instant.parse(startTime);

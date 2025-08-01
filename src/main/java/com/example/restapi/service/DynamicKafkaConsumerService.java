@@ -7,11 +7,17 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.core.ConsumerFactory;
+import org.springframework.kafka.listener.ConcurrentMessageListenerContainer;
+import org.springframework.kafka.listener.ContainerProperties;
+import org.springframework.kafka.listener.MessageListener;
+import org.springframework.kafka.listener.AcknowledgingMessageListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -25,7 +31,11 @@ public class DynamicKafkaConsumerService {
     @Autowired
     private InterestingEventService interestingEventService;
 
+    @Autowired
+    private ConsumerFactory<String, String> consumerFactory;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final List<ConcurrentMessageListenerContainer<String, String>> containers = new ArrayList<>();
 
     @PostConstruct
     public void initializeConsumers() {
@@ -33,135 +43,99 @@ public class DynamicKafkaConsumerService {
         
         List<KafkaTopicConfig.TopicConfig> topics = kafkaTopicConfig.getTopics();
         for (KafkaTopicConfig.TopicConfig topicConfig : topics) {
-            logger.info("Configured consumer for topic: '{}' with correlated topic: '{}', consumer group: '{}', key of interest: '{}', correlated key of interest: '{}'", 
+            logger.info("Configuring consumer for topic: '{}' with correlated topic: '{}', consumer group: '{}', key of interest: '{}', correlated key of interest: '{}'", 
                 topicConfig.getName(), topicConfig.getCorrelatedTopic(), topicConfig.getConsumerGroup(), 
                 topicConfig.getKeyOfInterest(), topicConfig.getCorrelatedKeyOfInterest());
+            
+            // Create consumer for main topic
+            createConsumerForTopic(topicConfig.getName(), topicConfig.getConsumerGroup(), topicConfig, false);
+            
+            // Create consumer for correlated topic
+            createConsumerForTopic(topicConfig.getCorrelatedTopic(), topicConfig.getConsumerGroup() + "-correlated", topicConfig, true);
         }
         
-        logger.info("Dynamic Kafka consumers configuration loaded successfully");
+        logger.info("Dynamic Kafka consumers initialized successfully. Total containers: {}", containers.size());
     }
 
     /**
-     * Consumer for test-topic (main topic)
+     * Create a Kafka consumer container for a specific topic
      */
-    @KafkaListener(
-        topics = "test-topic",
-        groupId = "test-consumer-group",
-        containerFactory = "kafkaListenerContainerFactory"
-    )
-    public void consumeTestTopic(ConsumerRecord<String, String> record, Acknowledgment ack) {
-        processMessage(record, ack, "test-consumer-group");
-    }
-
-    /**
-     * Consumer for test-topic-correlated (correlated topic)
-     */
-    @KafkaListener(
-        topics = "test-topic-correlated",
-        groupId = "test-consumer-group-correlated",
-        containerFactory = "kafkaListenerContainerFactory"
-    )
-    public void consumeTestTopicCorrelated(ConsumerRecord<String, String> record, Acknowledgment ack) {
-        processMessage(record, ack, "test-consumer-group-correlated");
-    }
-
-    /**
-     * Consumer for test-topic-json (main topic)
-     */
-    @KafkaListener(
-        topics = "test-topic-json",
-        groupId = "json-consumer-group",
-        containerFactory = "kafkaListenerContainerFactory"
-    )
-    public void consumeTestTopicJson(ConsumerRecord<String, String> record, Acknowledgment ack) {
-        processMessage(record, ack, "json-consumer-group");
-    }
-
-    /**
-     * Consumer for test-topic-json-correlated (correlated topic)
-     */
-    @KafkaListener(
-        topics = "test-topic-json-correlated",
-        groupId = "json-consumer-group-correlated",
-        containerFactory = "kafkaListenerContainerFactory"
-    )
-    public void consumeTestTopicJsonCorrelated(ConsumerRecord<String, String> record, Acknowledgment ack) {
-        processMessage(record, ack, "json-consumer-group-correlated");
-    }
-
-    /**
-     * Consumer for user-events (main topic)
-     */
-    @KafkaListener(
-        topics = "user-events",
-        groupId = "user-events-consumer-group",
-        containerFactory = "kafkaListenerContainerFactory"
-    )
-    public void consumeUserEvents(ConsumerRecord<String, String> record, Acknowledgment ack) {
-        processMessage(record, ack, "user-events-consumer-group");
-    }
-
-    /**
-     * Consumer for user-events-correlated (correlated topic)
-     */
-    @KafkaListener(
-        topics = "user-events-correlated",
-        groupId = "user-events-consumer-group-correlated",
-        containerFactory = "kafkaListenerContainerFactory"
-    )
-    public void consumeUserEventsCorrelated(ConsumerRecord<String, String> record, Acknowledgment ack) {
-        processMessage(record, ack, "user-events-consumer-group-correlated");
-    }
-
-    /**
-     * Consumer for system-events (main topic)
-     */
-    @KafkaListener(
-        topics = "system-events",
-        groupId = "system-events-consumer-group",
-        containerFactory = "kafkaListenerContainerFactory"
-    )
-    public void consumeSystemEvents(ConsumerRecord<String, String> record, Acknowledgment ack) {
-        processMessage(record, ack, "system-events-consumer-group");
-    }
-
-    /**
-     * Consumer for system-events-correlated (correlated topic)
-     */
-    @KafkaListener(
-        topics = "system-events-correlated",
-        groupId = "system-events-consumer-group-correlated",
-        containerFactory = "kafkaListenerContainerFactory"
-    )
-    public void consumeSystemEventsCorrelated(ConsumerRecord<String, String> record, Acknowledgment ack) {
-        processMessage(record, ack, "system-events-consumer-group-correlated");
-    }
-
-    /**
-     * Process a consumed message
-     */
-    private void processMessage(ConsumerRecord<String, String> record, Acknowledgment ack, String consumerGroup) {
+    private void createConsumerForTopic(String topic, String consumerGroup, KafkaTopicConfig.TopicConfig topicConfig, boolean isCorrelated) {
         try {
-            String topic = record.topic();
-            String key = record.key();
-            String value = record.value();
-            int partition = record.partition();
-            long offset = record.offset();
-            
-            logger.info("Consumer Group: '{}' | Topic: '{}' | Partition: {} | Offset: {} | Key: '{}' | Message: '{}'", 
-                consumerGroup, topic, partition, offset, key, value);
-            
-            // Extract and log keys of interest from JSON message
-            extractAndLogKeysOfInterest(topic, value, consumerGroup);
-            
-            // Acknowledge the message
-            ack.acknowledge();
-            
-            logger.debug("Message acknowledged successfully for topic: {} with consumer group: {}", topic, consumerGroup);
-            
+            // Create container properties
+            ContainerProperties containerProperties = new ContainerProperties(topic);
+            containerProperties.setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
+            containerProperties.setGroupId(consumerGroup);
+
+            // Create the container
+            ConcurrentMessageListenerContainer<String, String> container = new ConcurrentMessageListenerContainer<>(
+                consumerFactory, containerProperties);
+
+            // Set the message listener
+            container.setupMessageListener(new DynamicMessageListener(topicConfig, isCorrelated));
+
+            // Start the container
+            container.start();
+
+            // Store the container for cleanup
+            containers.add(container);
+
+            logger.info("Created dynamic consumer for topic: '{}' with consumer group: '{}' (correlated: {})", 
+                topic, consumerGroup, isCorrelated);
+
         } catch (Exception e) {
-            logger.error("Error processing message for consumer group: {}", consumerGroup, e);
-            // In a real application, you might want to implement dead letter queue logic here
+            logger.error("Error creating consumer for topic: '{}' with consumer group: '{}'", topic, consumerGroup, (Object) e);
+        }
+    }
+
+    /**
+     * Dynamic message listener implementation
+     */
+    private class DynamicMessageListener implements AcknowledgingMessageListener<String, String> {
+
+        private final KafkaTopicConfig.TopicConfig topicConfig;
+        private final boolean isCorrelated;
+
+        public DynamicMessageListener(KafkaTopicConfig.TopicConfig topicConfig, boolean isCorrelated) {
+            this.topicConfig = topicConfig;
+            this.isCorrelated = isCorrelated;
+        }
+
+        @Override
+        public void onMessage(ConsumerRecord<String, String> record, Acknowledgment acknowledgment) {
+            try {
+                String topic = record.topic();
+                String key = record.key();
+                String value = record.value();
+                int partition = record.partition();
+                long offset = record.offset();
+                String consumerGroup = isCorrelated ? topicConfig.getConsumerGroup() + "-correlated" : topicConfig.getConsumerGroup();
+                
+                logger.info("Consumer Group: '{}' | Topic: '{}' | Partition: {} | Offset: {} | Key: '{}' | Message: '{}'", 
+                    consumerGroup, topic, partition, offset, key, value);
+                
+                // Extract and log keys of interest from JSON message
+                extractAndLogKeysOfInterest(topic, value, consumerGroup);
+                
+                logger.debug("Message processed successfully for topic: {} with consumer group: {}", topic, consumerGroup);
+                
+                // Acknowledge the message after successful processing
+                acknowledgment.acknowledge();
+                logger.debug("Message acknowledged for topic: {} with consumer group: {}", topic, consumerGroup);
+                
+            } catch (Exception e) {
+                logger.error("Error processing message for topic: {} (correlated: {})", record.topic(), isCorrelated, (Object) e);
+                // In a real application, you might want to implement dead letter queue logic here
+                // Note: We still acknowledge the message even on error to prevent infinite reprocessing
+                // In a production environment, you might want to implement retry logic or dead letter queue
+                try {
+                    acknowledgment.acknowledge();
+                    logger.debug("Message acknowledged after error for topic: {} with consumer group: {}", record.topic(), 
+                        isCorrelated ? topicConfig.getConsumerGroup() + "-correlated" : topicConfig.getConsumerGroup());
+                } catch (Exception ackException) {
+                    logger.error("Error acknowledging message after processing error", (Object) ackException);
+                }
+            }
         }
     }
 
@@ -203,7 +177,7 @@ public class DynamicKafkaConsumerService {
                             topic, keyName, keyOfInterest);
                     } catch (Exception e) {
                         logger.error("Error persisting interesting event to database - Topic: '{}', Key: '{}', Value: '{}'", 
-                            topic, keyName, keyOfInterest, e);
+                            topic, keyName, keyOfInterest, (Object) e);
                     }
                 } else if (keyName != null) {
                     logger.warn("Consumer Group: '{}' | Topic: '{}' | Key of Interest '{}' not found in JSON message", 
@@ -226,7 +200,7 @@ public class DynamicKafkaConsumerService {
                             originalKeyName, keyOfInterest, topic);
                     } catch (Exception e) {
                         logger.error("Error checking correlation for original key: '{}' with value: '{}' from correlated topic: '{}'", 
-                            originalKeyName, keyOfInterest, topic, e);
+                            originalKeyName, keyOfInterest, topic, (Object) e);
                     }
                 } else if (keyName != null) {
                     logger.warn("Consumer Group: '{}' | Topic: '{}' | Correlated Key of Interest '{}' not found in JSON message", 
@@ -236,7 +210,22 @@ public class DynamicKafkaConsumerService {
             
         } catch (Exception e) {
             logger.error("Error extracting keys of interest from JSON message for topic: {} and consumer group: {}", 
-                topic, consumerGroup, e);
+                topic, consumerGroup, (Object) e);
         }
+    }
+
+    @PreDestroy
+    public void cleanup() {
+        logger.info("Stopping {} dynamic Kafka consumer containers", containers.size());
+        for (ConcurrentMessageListenerContainer<String, String> container : containers) {
+            try {
+                container.stop();
+                logger.debug("Stopped container for topic: {}", container.getContainerProperties().getTopics());
+            } catch (Exception e) {
+                logger.error("Error stopping container", (Object) e);
+            }
+        }
+        containers.clear();
+        logger.info("All dynamic Kafka consumer containers stopped");
     }
 } 
