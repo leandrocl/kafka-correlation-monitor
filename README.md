@@ -1,3 +1,11 @@
+# ⚠️ AI-GENERATED PROJECT DISCLAIMER
+
+**This entire project was created leveraging generative AI, specifically the Cursor platform, as a personal discovery and proof of concept initiated by the repository's owner without him writing a single line of code by himself.**
+
+**Visitors are welcome to clone, fork, change the project and use at their own risk. There are no commitments or responsibilities assumed by the repository owner.**
+
+---
+
 # Kafka Correlation Monitor
 
 A comprehensive Spring Boot REST API that implements Kafka correlation monitoring and event processing. The application dynamically consumes messages from Kafka topics, extracts keys of interest, persists interesting events, and correlates them across related topics.
