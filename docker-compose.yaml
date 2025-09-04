@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  kafka:
+    image: apache/kafka:4.1.0
+    container_name: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      # KRaft settings
+      - KAFKA_NODE_ID=0
+      - KAFKA_PROCESS_ROLES=controller,broker
+      - KAFKA_CONTROLLER_QUORUM_VOTERS=0@kafka:9093
+      # Listeners
+      - KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://:9092
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+    networks:
+      - kcm
+
+  correlation-service:
+    build: .
+    container_name: correlation-service
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_KAFKA_BOOTSTRAP-SERVERS=kafka:9092
+    volumes:
+      - ./data:/app/data
+    networks:
+      - kcm
+    depends_on:
+      - kafka
+
+networks:
+  kcm:
+    driver: bridge
