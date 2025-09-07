@@ -68,22 +68,23 @@ class InterestingEventControllerTest {
         int limit = 10;
         List<InterestingEvent> events = Arrays.asList(sampleEvent, correlatedEvent);
         
-        when(interestingEventService.findAllWithOffset(offset, limit))
-            .thenReturn(events);
+        Page<InterestingEvent> eventsPage = new PageImpl<>(events);
+        when(interestingEventService.findAll(offset, limit))
+            .thenReturn(eventsPage);
 
         // When & Then
         mockMvc.perform(get("/api/v1/interesting-events")
-                .param("offset", String.valueOf(offset))
-                .param("limit", String.valueOf(limit))
+                .param("page", String.valueOf(offset))
+                .param("size", String.valueOf(limit))
                 .contentType(MediaType.APPLICATION_JSON))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.length()").value(2))
-            .andExpect(jsonPath("$[0].id").value(1))
-            .andExpect(jsonPath("$[0].topicName").value("test-topic"))
-            .andExpect(jsonPath("$[1].id").value(2))
-            .andExpect(jsonPath("$[1].isCorrelated").value(true));
+            .andExpect(jsonPath("$.events.length()").value(2))
+            .andExpect(jsonPath("$.events[0].id").value(1))
+            .andExpect(jsonPath("$.events[0].topicName").value("test-topic"))
+            .andExpect(jsonPath("$.events[1].id").value(2))
+            .andExpect(jsonPath("$.events[1].isCorrelated").value(true));
 
-        verify(interestingEventService, times(1)).findAllWithOffset(offset, limit);
+        verify(interestingEventService, times(1)).findAll(offset, limit);
     }
 
     @Test
@@ -99,10 +100,10 @@ class InterestingEventControllerTest {
         mockMvc.perform(get("/api/v1/interesting-events/{id}", eventId)
                 .contentType(MediaType.APPLICATION_JSON))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.id").value(1))
-            .andExpect(jsonPath("$.topicName").value("test-topic"))
-            .andExpect(jsonPath("$.keyOfInterestName").value("userId"))
-            .andExpect(jsonPath("$.keyOfInterestValue").value("user123"));
+            .andExpect(jsonPath("$.event.id").value(1))
+            .andExpect(jsonPath("$.event.topicName").value("test-topic"))
+            .andExpect(jsonPath("$.event.keyOfInterestName").value("userId"))
+            .andExpect(jsonPath("$.event.keyOfInterestValue").value("user123"));
 
         verify(interestingEventService, times(1)).findById(eventId);
     }
@@ -138,13 +139,14 @@ class InterestingEventControllerTest {
             .thenReturn(eventPage);
 
         // When & Then
-        mockMvc.perform(get("/api/v1/interesting-events/topic/{topicName}", topicName)
+        mockMvc.perform(get("/api/v1/interesting-events/by-topic")
+                .param("topicName", topicName)
                 .param("page", String.valueOf(page))
                 .param("size", String.valueOf(size))
                 .contentType(MediaType.APPLICATION_JSON))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.content.length()").value(1))
-            .andExpect(jsonPath("$.content[0].topicName").value("test-topic"));
+            .andExpect(jsonPath("$.events.length()").value(1))
+            .andExpect(jsonPath("$.events[0].topicName").value("test-topic"));
 
         verify(interestingEventService, times(1)).findByTopicName(topicName, page, size);
     }
@@ -163,13 +165,14 @@ class InterestingEventControllerTest {
             .thenReturn(eventPage);
 
         // When & Then
-        mockMvc.perform(get("/api/v1/interesting-events/key/{keyName}", keyName)
+        mockMvc.perform(get("/api/v1/interesting-events/by-key")
+                .param("keyOfInterestName", keyName)
                 .param("page", String.valueOf(page))
                 .param("size", String.valueOf(size))
                 .contentType(MediaType.APPLICATION_JSON))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.content.length()").value(1))
-            .andExpect(jsonPath("$.content[0].keyOfInterestName").value("userId"));
+            .andExpect(jsonPath("$.events.length()").value(1))
+            .andExpect(jsonPath("$.events[0].keyOfInterestName").value("userId"));
 
         verify(interestingEventService, times(1)).findByKeyOfInterestName(keyName, page, size);
     }
@@ -184,10 +187,10 @@ class InterestingEventControllerTest {
             .thenReturn(expectedCount);
 
         // When & Then
-        mockMvc.perform(get("/api/v1/interesting-events/count")
+        mockMvc.perform(get("/api/v1/interesting-events/stats")
                 .contentType(MediaType.APPLICATION_JSON))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.count").value(expectedCount));
+            .andExpect(jsonPath("$.totalEvents").value(expectedCount));
 
         verify(interestingEventService, times(1)).countAllEvents();
     }
@@ -223,7 +226,7 @@ class InterestingEventControllerTest {
         mockMvc.perform(delete("/api/v1/interesting-events/{id}", eventId)
                 .contentType(MediaType.APPLICATION_JSON))
             .andExpect(status().isNotFound())
-            .andExpect(jsonPath("$.message").value("Interesting event not found"));
+            .andExpect(jsonPath("$.message").value("No event found with ID: 999"));
 
         verify(interestingEventService, times(1)).deleteById(eventId);
     }
@@ -233,12 +236,12 @@ class InterestingEventControllerTest {
     void shouldHandleInvalidPaginationParameters() throws Exception {
         // When & Then
         mockMvc.perform(get("/api/v1/interesting-events")
-                .param("offset", "-1")
-                .param("limit", "0")
+                .param("page", "-1")
+                .param("size", "0")
                 .contentType(MediaType.APPLICATION_JSON))
             .andExpect(status().isBadRequest());
 
-        verify(interestingEventService, never()).findAllWithOffset(anyInt(), anyInt());
+        verify(interestingEventService, never()).findAll(anyInt(), anyInt());
     }
 
     @Test
