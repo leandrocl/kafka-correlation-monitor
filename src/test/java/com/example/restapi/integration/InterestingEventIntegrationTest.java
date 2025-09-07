@@ -4,6 +4,7 @@ import com.example.restapi.entity.InterestingEvent;
 import com.example.restapi.repository.InterestingEventRepository;
 import com.example.restapi.service.InterestingEventService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -12,6 +13,8 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureWebM
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +42,11 @@ class InterestingEventIntegrationTest {
     @Container
     static KafkaContainer kafka = new KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.4.0"));
 
+    @DynamicPropertySource
+    static void configureProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.kafka.bootstrap-servers", kafka::getBootstrapServers);
+    }
+
     @Autowired
     private WebApplicationContext webApplicationContext;
 
@@ -55,7 +63,16 @@ class InterestingEventIntegrationTest {
     void setUp() {
         mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
         objectMapper = new ObjectMapper();
+        // Clean up database before each test
         interestingEventRepository.deleteAll();
+        interestingEventRepository.flush();
+    }
+    
+    @AfterEach
+    void tearDown() {
+        // Clean up database after each test
+        interestingEventRepository.deleteAll();
+        interestingEventRepository.flush();
     }
 
     @Test
@@ -83,11 +100,11 @@ class InterestingEventIntegrationTest {
         mockMvc.perform(get("/api/v1/interesting-events/{id}", createdEvent.getId())
                 .contentType(MediaType.APPLICATION_JSON))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.id").value(createdEvent.getId()))
-            .andExpect(jsonPath("$.topicName").value(topicName))
-            .andExpect(jsonPath("$.keyOfInterestName").value(keyName))
-            .andExpect(jsonPath("$.keyOfInterestValue").value(keyValue))
-            .andExpect(jsonPath("$.isCorrelated").value(false));
+            .andExpect(jsonPath("$.event.id").value(createdEvent.getId()))
+            .andExpect(jsonPath("$.event.topicName").value(topicName))
+            .andExpect(jsonPath("$.event.keyOfInterestName").value(keyName))
+            .andExpect(jsonPath("$.event.keyOfInterestValue").value(keyValue))
+            .andExpect(jsonPath("$.event.isCorrelated").value(false));
     }
 
     @Test
@@ -100,18 +117,18 @@ class InterestingEventIntegrationTest {
 
         // When & Then
         mockMvc.perform(get("/api/v1/interesting-events")
-                .param("offset", "0")
-                .param("limit", "2")
+                .param("page", "0")
+                .param("size", "2")
                 .contentType(MediaType.APPLICATION_JSON))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.length()").value(2));
+            .andExpect(jsonPath("$.events.length()").value(2));
 
         mockMvc.perform(get("/api/v1/interesting-events")
-                .param("offset", "2")
-                .param("limit", "2")
+                .param("page", "1")
+                .param("size", "2")
                 .contentType(MediaType.APPLICATION_JSON))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.length()").value(1));
+            .andExpect(jsonPath("$.events.length()").value(1));
     }
 
     @Test
@@ -124,14 +141,15 @@ class InterestingEventIntegrationTest {
         interestingEventService.saveInterestingEvent("other-topic", "key3", "value3");
 
         // When & Then
-        mockMvc.perform(get("/api/v1/interesting-events/topic/{topicName}", topicName)
+        mockMvc.perform(get("/api/v1/interesting-events/by-topic")
+                .param("topicName", topicName)
                 .param("page", "0")
                 .param("size", "10")
                 .contentType(MediaType.APPLICATION_JSON))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.content.length()").value(2))
-            .andExpect(jsonPath("$.content[0].topicName").value(topicName))
-            .andExpect(jsonPath("$.content[1].topicName").value(topicName));
+            .andExpect(jsonPath("$.events.length()").value(2))
+            .andExpect(jsonPath("$.events[0].topicName").value(topicName))
+            .andExpect(jsonPath("$.events[1].topicName").value(topicName));
     }
 
     @Test
@@ -144,14 +162,15 @@ class InterestingEventIntegrationTest {
         interestingEventService.saveInterestingEvent("topic3", "otherKey", "value3");
 
         // When & Then
-        mockMvc.perform(get("/api/v1/interesting-events/key/{keyName}", keyName)
+        mockMvc.perform(get("/api/v1/interesting-events/by-key")
+                .param("keyOfInterestName", keyName)
                 .param("page", "0")
                 .param("size", "10")
                 .contentType(MediaType.APPLICATION_JSON))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.content.length()").value(2))
-            .andExpect(jsonPath("$.content[0].keyOfInterestName").value(keyName))
-            .andExpect(jsonPath("$.content[1].keyOfInterestName").value(keyName));
+            .andExpect(jsonPath("$.events.length()").value(2))
+            .andExpect(jsonPath("$.events[0].keyOfInterestName").value(keyName))
+            .andExpect(jsonPath("$.events[1].keyOfInterestName").value(keyName));
     }
 
     @Test
@@ -163,10 +182,10 @@ class InterestingEventIntegrationTest {
         interestingEventService.saveInterestingEvent("topic3", "key3", "value3");
 
         // When & Then
-        mockMvc.perform(get("/api/v1/interesting-events/count")
+        mockMvc.perform(get("/api/v1/interesting-events/stats")
                 .contentType(MediaType.APPLICATION_JSON))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.count").value(3));
+            .andExpect(jsonPath("$.totalEvents").value(3));
     }
 
     @Test
@@ -196,7 +215,7 @@ class InterestingEventIntegrationTest {
         mockMvc.perform(delete("/api/v1/interesting-events/{id}", 999L)
                 .contentType(MediaType.APPLICATION_JSON))
             .andExpect(status().isNotFound())
-            .andExpect(jsonPath("$.message").value("Interesting event not found"));
+            .andExpect(jsonPath("$.message").value("No event found with ID: 999"));
     }
 
     @Test
@@ -256,8 +275,8 @@ class InterestingEventIntegrationTest {
     void shouldHandleInvalidPaginationParameters() throws Exception {
         // When & Then
         mockMvc.perform(get("/api/v1/interesting-events")
-                .param("offset", "-1")
-                .param("limit", "0")
+                .param("page", "-1")
+                .param("size", "0")
                 .contentType(MediaType.APPLICATION_JSON))
             .andExpect(status().isBadRequest());
     }
@@ -267,10 +286,10 @@ class InterestingEventIntegrationTest {
     void shouldHandleEmptyDatabaseGracefully() throws Exception {
         // When & Then
         mockMvc.perform(get("/api/v1/interesting-events")
-                .param("offset", "0")
-                .param("limit", "10")
+                .param("page", "0")
+                .param("size", "10")
                 .contentType(MediaType.APPLICATION_JSON))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.length()").value(0));
+            .andExpect(jsonPath("$.events.length()").value(0));
     }
 } 
