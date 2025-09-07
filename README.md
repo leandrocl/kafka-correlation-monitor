@@ -6,7 +6,7 @@
 
 ---
 
-# Kafka Correlation Monitor
+## Kafka Correlation Monitor
 
 A comprehensive Spring Boot REST API that implements Kafka correlation monitoring and event processing. The application dynamically consumes messages from Kafka topics, extracts keys of interest, persists interesting events, and correlates them across related topics.
 
@@ -26,16 +26,19 @@ A comprehensive Spring Boot REST API that implements Kafka correlation monitorin
 ## Key Components
 
 ### Kafka Correlation System
+
 - **Dynamic Topic Configuration**: Configure topics with keys of interest and correlated topics
 - **Event Persistence**: Automatically persist events with keys of interest to database
 - **Correlation Logic**: Match events across main and correlated topics
 - **Real-time Processing**: Process messages as they arrive from Kafka
 
 ### Scheduled Tasks
+
 - **Cleanup Scheduler**: Automatically removes correlated events (configurable interval)
 - **Monitor Scheduler**: Tracks uncorrelated events older than threshold (configurable)
 
 ### Database Management
+
 - **Flyway Migrations**: Automated database schema management
 - **HSQLDB**: Lightweight, file-based database
 - **Event Storage**: Persistent storage of interesting events with correlation data
@@ -109,21 +112,22 @@ scheduler:
 ## API Endpoints
 
 ### Health Check
+
 - **GET** `/api/v1/health`
 - Tests database connectivity
 - Returns HTTP 200 if healthy, 503 if unhealthy
 
 ### Kafka Producer
+
 - **POST** `/api/v1/kafka/produce`
 - Send messages to Kafka topics
 - Request body: `{"kafkaTopic": "topic-name", "message": "JSON message"}`
 
 ### Interesting Events
+
 - **GET** `/api/v1/interesting-events`
 - List all interesting events with pagination
 - Query parameters: `offset`, `limit`
-
-
 
 ## Testing the Correlation System
 
@@ -169,17 +173,19 @@ CREATE TABLE interesting_events (
 ## Monitoring and Logging
 
 ### Log Files
+
 - **Location**: `output.log` in project root
 - **Rotation**: Daily with 30-day retention
 - **Size Limit**: 3GB total
 
 ### Scheduler Logs
+
 - **Cleanup**: Logs number of correlated events deleted
 - **Monitor**: Logs uncorrelated events count by topic
 
 ### Example Log Output
 
-```
+```bash
 Starting cleanup of correlated events from interesting_events table...
 Cleanup completed successfully. Deleted 1 correlated event records from interesting_events table.
 
@@ -191,7 +197,7 @@ Topic: 'user-events' - Uncorrelated events count: 1
 
 ## Project Structure
 
-```
+```bash
 src/
 ├── main/
 │   ├── java/com/example/restapi/
@@ -223,21 +229,25 @@ src/
 ## Development
 
 ### Running Tests
+
 ```bash
 mvn test
 ```
 
 ### Building JAR
+
 ```bash
 mvn clean package
 ```
 
 ### Running JAR
+
 ```bash
 java -jar target/rest-api-1.0.0.jar
 ```
 
 ### Database Reset
+
 ```bash
 rm -rf data/
 mvn flyway:migrate
@@ -246,17 +256,20 @@ mvn flyway:migrate
 ## Configuration Options
 
 ### Kafka Configuration
+
 - **Bootstrap Servers**: `localhost:9092` (configurable)
 - **Consumer Groups**: Separate groups for main and correlated topics
 - **Auto Offset Reset**: `earliest`
 - **Enable Auto Commit**: `false`
 
 ### Database Configuration
+
 - **Type**: HSQLDB with file persistence
 - **Location**: `./data/restapi`
 - **Migrations**: Automatic via Flyway
 
-### Scheduler Configuration
+### Scheduler Parameters
+
 - **Cleanup Interval**: 60 seconds (configurable)
 - **Monitor Interval**: 30 seconds (configurable)
 - **Age Threshold**: 300 seconds (configurable)
@@ -264,20 +277,23 @@ mvn flyway:migrate
 ## Troubleshooting
 
 ### Kafka Connection Issues
+
 - Ensure Kafka is running on `localhost:9092`
 - Check topic configuration in `application.yml`
 - Verify consumer groups are properly configured
 
 ### Database Issues
+
 - Check if the `./data` directory is writable
 - Run `mvn flyway:migrate` to apply migrations
 - Verify HSQLDB configuration in `application.yml`
 
 ### Scheduler Issues
+
 - Check logs for scheduler execution
 - Verify configuration values in `application.yml`
 - Ensure database connectivity
 
 ## License
 
-This project is for educational purposes. 
+This project is for educational purposes.
